@@ -47,10 +47,11 @@ import readline from 'readline';
 import { default as semver } from 'semver';
 import yargs from 'yargs';
 import validateProjectName from 'validate-npm-package-name';
+import { fileURLToPath } from 'url';
 
 import { run, setMessage } from '@probedjs/task-runner';
 
-const { ensureDir, lstat, readdir, rm, writeFile } = fs;
+const { ensureDir, lstat, readdir, rm, writeFile, readFile } = fs;
 
 const isSafeToCreateProjectIn = async (root: string, name: string) => {
   const validFiles = [
@@ -159,10 +160,25 @@ const install = async (opts: {
   const child = spawn(command, args);
 
   let outlog = '';
+
+  const sendLog = (msg: string) => {
+    const crLoc = msg.indexOf('\r');
+    const lfLoc = msg.indexOf('\n');
+
+    let breakLoc = Math.min(crLoc, lfLoc);
+    if (breakLoc === -1) {
+      breakLoc = Math.max(crLoc, lfLoc);
+    }
+
+    setMessage(msg.slice(0, Math.max(0, breakLoc)));
+  };
+
   child.stdout.on('data', (data) => {
+    sendLog(data.toString());
     outlog += data.toString();
   });
   child.stderr.on('data', (data) => {
+    sendLog(data.toString());
     outlog += data.toString();
   });
 
@@ -252,10 +268,16 @@ export const init = async (opts: InitOptions): Promise<void> => {
     });
 
     run('installing dependencies', async () => {
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = path.dirname(__filename);
+      const { version } = JSON.parse(
+        await readFile(path.resolve(__dirname, '../../package.json'), 'utf-8')
+      );
+
       await packageJsonCreated;
       await install({
         dev: true,
-        packages: [`@probedjs/liberator@^${process.env.npm_package_version}`],
+        packages: [`@probedjs/liberator@^${version}`],
         root: root,
       });
     });
