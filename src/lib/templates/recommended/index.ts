@@ -36,7 +36,7 @@ const index_ts: FileDef = {
   contents: `
 /** Hello! */
 export const Hello = (name: string): string => {
-    return "Hello " + name;
+  return "Hello " + name;
 };
 `,
 };
@@ -47,9 +47,9 @@ const sampleTest_ts: FileDef = {
   contents: `
 import { Hello } from '<%= cfg.libName %>';
 describe('The Hello Function', () => {
-    it('produces the expected output', () => {
-        expect(Hello('world')).toBe('Hello world');
-    });
+  it('produces the expected output', () => {
+    expect(Hello('world')).toBe('Hello world');
+  });
 });
 `,
 };
