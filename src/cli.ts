@@ -19,6 +19,7 @@
 import { command as buildCommand } from './lib/commands/build.js';
 import { command as initCommand } from './lib/commands/init.js';
 import { command as lintCommand } from './lib/commands/lint.js';
+import { command as testCommand } from './lib/commands/test.js';
 
 import { hideBin } from 'yargs/helpers';
 import yargs from 'yargs';
@@ -29,6 +30,7 @@ yargs(hideBin(process.argv))
   .command(lintCommand)
   .command(buildCommand)
   .command(initCommand)
+  .command(testCommand)
   .help('h')
   .alias('h', 'help')
   .demandCommand()

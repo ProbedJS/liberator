@@ -15,7 +15,7 @@
  */
 
 import Context, { loadContext } from '../context.js';
-import { run, setMessage, setStatus } from '@probedjs/task-runner';
+import { run, update } from '@probedjs/task-runner';
 
 import yargs from 'yargs';
 import { ESLint, Linter } from 'eslint';
@@ -32,24 +32,28 @@ export const lint = async (opts: LintOptions, ctx: Context): Promise<void> => {
     fix: opts.fix,
   };
 
-  await run('Lint...', async () => {
-    const linter = new ESLint(options);
-    const fmt = run('loading Formatter', () => linter.loadFormatter('stylish'));
+  await run(async () => {
+    update({ label: 'Lint...' });
 
-    const results = run('Processing source', async () => {
+    const linter = new ESLint(options);
+    const fmt = run(() => linter.loadFormatter('stylish'), {
+      label: 'loading Formatter',
+    });
+
+    const results = run(async () => {
+      update({ label: 'Processing source' });
+
       const results = await linter.lintFiles('./src/**/*');
       let output = false;
       if (results.some((r) => r.warningCount > 0)) {
-        setMessage('Warnings found');
-        setStatus('warn');
+        update({ message: 'Warnings found', status: 'warn' });
         output = true;
       } else if (results.some((r) => r.errorCount > 0)) {
-        setMessage('Errors found');
-        setStatus('fail');
+        update({ message: 'Errors found', status: 'fail' });
         output = true;
       }
 
-      if(output) {
+      if (output) {
         const resultText = (await fmt).format(results);
         console.warn(resultText);
       }
@@ -58,7 +62,9 @@ export const lint = async (opts: LintOptions, ctx: Context): Promise<void> => {
     });
 
     if (opts.fix) {
-      run('Applying fixes', async () => ESLint.outputFixes(await results));
+      run(async () => ESLint.outputFixes(await results), {
+        label: 'Applying fixes',
+      });
     }
   });
 

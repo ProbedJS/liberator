@@ -49,7 +49,7 @@ import yargs from 'yargs';
 import validateProjectName from 'validate-npm-package-name';
 import { fileURLToPath } from 'url';
 
-import { run, setMessage } from '@probedjs/task-runner';
+import { run, update } from '@probedjs/task-runner';
 
 const { ensureDir, lstat, readdir, rm, writeFile, readFile } = fs;
 
@@ -80,16 +80,18 @@ const isSafeToCreateProjectIn = async (root: string, name: string) => {
     return errorLogFilePatterns.some((pattern) => file.startsWith(pattern));
   };
 
-  run('Checking existing files', async () => {
+  run(async () => {
+    update({ label: 'Checking existing files' });
+
     const conflicts = (await readdir(root))
       .filter((file) => !validFiles.includes(file))
       .filter((file) => !/\.iml$/.test(file))
       .filter((file) => !isErrorLog(file));
 
     if (conflicts.length > 0) {
-      setMessage(
-        `${chalk.green(name)} contains potentially conflicting files.`
-      );
+      update({
+        message: `${chalk.green(name)} contains potentially conflicting files.`,
+      });
 
       for (const file of conflicts) {
         try {
@@ -109,7 +111,9 @@ const isSafeToCreateProjectIn = async (root: string, name: string) => {
     }
   });
 
-  run('Removing old error logs', async () => {
+  run(async () => {
+    update({ label: 'Removing old error logs' });
+
     const oldFiles = await readdir(root);
 
     await Promise.all(
@@ -170,7 +174,7 @@ const install = async (opts: {
       breakLoc = Math.max(crLoc, lfLoc);
     }
 
-    setMessage(msg.slice(0, Math.max(0, breakLoc)));
+    update({ message: msg.slice(0, Math.max(0, breakLoc)) });
   };
 
   child.stdout.on('data', (data) => {
@@ -212,7 +216,8 @@ export interface InitOptions {
 export const init = async (opts: InitOptions): Promise<void> => {
   const { name } = opts;
 
-  await run(`Init ${name}`, async () => {
+  await run(async () => {
+    update({ label: `Init ${name}` });
     if (!semver.satisfies(process.version, '>=14')) {
       throw new Error(chalk.red(`Node ${process.version} is too old.`));
     }
@@ -222,10 +227,10 @@ export const init = async (opts: InitOptions): Promise<void> => {
 
     checkAppName(appName);
 
-    await run('Creating dir', () => ensureDir(name));
-    await run('Checking destination', () =>
-      isSafeToCreateProjectIn(root, name)
-    );
+    await run(() => ensureDir(name), { label: 'Creating dir' });
+    await run(() => isSafeToCreateProjectIn(root, name), {
+      label: 'Checking destination',
+    });
 
     process.chdir(root);
 
@@ -236,11 +241,14 @@ export const init = async (opts: InitOptions): Promise<void> => {
       license: opts.license,
       author: opts.author,
     };
-    const template = run(`loading template ${opts.template}`, async () =>
-      getTemplate(opts.template, cfg)
-    );
 
-    const packageJsonCreated = run('creating package.json', async () => {
+    const template = run(async () => getTemplate(opts.template, cfg), {
+      label: `loading template ${opts.template}`,
+    });
+
+    const packageJsonCreated = run(async () => {
+      update({ label: 'creating package.json' });
+
       // Not used right now, but it will be soon enough.
       await template;
 
@@ -267,7 +275,9 @@ export const init = async (opts: InitOptions): Promise<void> => {
       );
     });
 
-    run('installing dependencies', async () => {
+    run(async () => {
+      update({ label: 'installing dependencies' });
+
       const __filename = fileURLToPath(import.meta.url);
       const __dirname = path.dirname(__filename);
       const { version } = JSON.parse(
@@ -282,9 +292,11 @@ export const init = async (opts: InitOptions): Promise<void> => {
       });
     });
 
-    run('Copying files', async () => {
+    run(async () => {
+      update({ label: 'Copying files' });
       for (const file of await template) {
-        run(file.name, async () => {
+        run(async () => {
+          update({ label: file.name });
           await ensureDir(path.dirname(file.name));
           await writeFile(
             path.resolve(root, file.name),

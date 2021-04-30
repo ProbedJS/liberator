@@ -18,7 +18,7 @@ import Context, { loadContext } from '../context.js';
 import { compileBanner } from '../templates/utils.js';
 import { templateConfigFromPackage } from '../templates/index.js';
 
-import { run, runOptional, setMessage } from '@probedjs/task-runner';
+import { run, tryRun, update } from '@probedjs/task-runner';
 
 import { default as fs } from 'fs-extra';
 import chalk from 'chalk';
@@ -109,13 +109,15 @@ const performRollup = async (packageJson: JsonObject, ctx: Context) => {
       rollupCleanup({ comments: 'none', extensions: ['.ts', '.js'] }),
     ],
     onwarn: (warning) => {
-      setMessage(warning.message);
+      update({ message: warning.message });
       console.warn(formatWarning(warning));
     },
   };
-  const bundle = run('Ingress', () => rollup(inputOpts));
+  const bundle = run(() => rollup(inputOpts), { label: 'Ingress' });
 
-  const done = run('Generation', async () => {
+  const done = run(async () => {
+    update({ label: 'Generation' });
+
     const esmOut: OutputOptions = {
       sourcemap: true,
       file: path.resolve(ctx.distDir, 'esm/index.js'),
@@ -123,7 +125,7 @@ const performRollup = async (packageJson: JsonObject, ctx: Context) => {
       format: 'es',
     };
 
-    run('esm', async () => (await bundle).write(esmOut));
+    run(async () => (await bundle).write(esmOut), { label: 'esm' });
 
     const cjsOut: OutputOptions = {
       sourcemap: true,
@@ -132,10 +134,11 @@ const performRollup = async (packageJson: JsonObject, ctx: Context) => {
       format: 'cjs',
     };
 
-    run('cjs', async () => (await bundle).write(cjsOut));
+    run(async () => (await bundle).write(cjsOut), { label: 'cjs' });
   });
 
-  run('Closing up', async () => {
+  run(async () => {
+    update({ label: 'Closing Up' });
     await done;
     (await bundle).close();
   });
@@ -145,17 +148,20 @@ export const build = async (
   opts: BuildOptions,
   ctx: Context
 ): Promise<void> => {
-  await run('Build', async () => {
-    if (opts.clean) {
-      run('Cleaning up previous build', () =>
-        rm(ctx.distDir, { recursive: true, force: true })
-      );
-    }
-    const distReady = runOptional('Creating dist dir', () =>
-      mkdir(ctx.distDir)
-    );
+  await run(async () => {
+    update({ label: 'Build' });
 
-    const packageJson = run('Loading package.json', async () => {
+    if (opts.clean) {
+      await run(() => rm(ctx.distDir, { recursive: true, force: true }), {
+        label: 'Cleaning up previous build',
+      });
+    }
+    const distReady = tryRun(() => mkdir(ctx.distDir), {
+      label: 'Creating dist dir',
+    });
+
+    const packageJson = run(async () => {
+      update({ label: 'Loading package.json' });
       const source = (
         await readFile(path.resolve(ctx.rootDir, 'package.json'), 'utf-8')
       ).toString();
@@ -163,16 +169,24 @@ export const build = async (
     });
 
     if (!opts.packageOnly) {
-      run('rolling up...', async () => performRollup(await packageJson, ctx));
+      run(async () => performRollup(await packageJson, ctx), {
+        label: 'Rolling up...',
+      });
     }
 
-    run('packaging', async () => {
-      run('building package.json', async () => {
+    run(async () => {
+      update({ label: 'packaging' });
+
+      run(async () => {
+        update({ label: 'building package.json' });
+
         await distReady;
         processPackageJson(await packageJson, ctx);
       });
 
-      run('Creating a npmignore', async () => {
+      run(async () => {
+        update({ label: 'Creating a npmignore' });
+
         await distReady;
         await writeFile(
           path.resolve(ctx.distDir, '.npmignore'),
@@ -180,14 +194,18 @@ export const build = async (
         );
       });
 
-      run('Additional files', async () => {
+      run(async () => {
+        update({ label: 'Additional files' });
+
         await distReady;
         ctx.additionalFiles.forEach((file) => {
-          runOptional(`${file}`, () =>
-            copyFile(
-              path.resolve(ctx.rootDir, file),
-              path.resolve(ctx.distDir, file)
-            )
+          tryRun(
+            () =>
+              copyFile(
+                path.resolve(ctx.rootDir, file),
+                path.resolve(ctx.distDir, file)
+              ),
+            { label: file }
           );
         });
       });
